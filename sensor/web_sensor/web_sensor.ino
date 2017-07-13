@@ -23,8 +23,8 @@
 // Define how many callback functions you have. Default is 1.
 #define CALLBACK_FUNCTIONS 1
 
-#define HOST "wall.electro-control-center.ru"
-#define PATH "/ws/<token>"
+#define HOST "192.168.0.15" // wall.electro-control-center.ru
+#define PATH "/" // /ws/<token>
 
 #include <WebSocketClient.h>
 
@@ -33,7 +33,7 @@ byte mac[] = {
 };
 // fill in an available IP address on your network here,
 // for manual configuration:
-IPAddress ip(192, 168, 1, 177);
+IPAddress ip(192, 168, 0, 107);
 
 #define DHTPIN 2 // pin
 
@@ -45,21 +45,25 @@ EthernetClient client;
 WebSocketClient webSocketClient;
 
 unsigned long lastPostSensorTime = 0; // Время последней отправки данных с датчиков
-const unsigned long postSensorsInterval = 15L * 1000L; // delay between updates, in milliseconds
+const unsigned long postSensorsInterval = 0.5L * 1000L; // delay between updates, in milliseconds
 
 String data;
 
 float t; // Температура с DHT-22
 float h; // Влажность с DHT-22
 
-boolean connectClient() {
+boolean connectClient() 
+{
 	client.stop();
-	if (client.connect(HOST, 80)) {
+
+	if (client.connect(HOST, 80)) 
+	{
 #ifdef DEBUGGING
 		Serial.println("Connected");
 #endif
 	}
-	else {
+	else 
+	{
 #ifdef DEBUGGING
 		Serial.println("Connection failed.");
 #endif
@@ -70,7 +74,8 @@ boolean connectClient() {
 	webSocketClient.path = PATH;
 	webSocketClient.host = HOST;
 
-	if (webSocketClient.handshake(client)) {
+	if (webSocketClient.handshake(client)) 
+	{
 #ifdef DEBUGGING
 		Serial.println("Handshake successful");
 #endif
@@ -84,7 +89,8 @@ boolean connectClient() {
 	return true;
 }
 
-void setup() {
+void setup() 
+{
 #ifdef DEBUGGING
 	Serial.begin(9600);
 	Serial.println("Start");
@@ -102,24 +108,30 @@ void setup() {
 #endif
 
 	// Try reconnect. Lock all another actions
-	while (!connectClient()) {
+	while (!connectClient()) 
+	{
 		delay(2000);
 	};
 }
 
-void loop() {
-	if (client.connected()) {
+void loop() 
+{
+	if (client.connected()) 
+	{
 		data = "";
 		// Try get data from websocket
 		webSocketClient.getData(data);
 
-		if (data.length() > 0) {
+		if (data.length() > 0) 
+		{
 #ifdef DEBUGGING
 			Serial.print("Received data: ");
 			Serial.println(data);
 #endif
 		}
-		if (millis() - lastPostSensorTime > postSensorsInterval) {
+
+		if (millis() - lastPostSensorTime > postSensorsInterval) 
+		{
 #ifdef DEBUGGING
 			Serial.println("Creating data");
 #endif
@@ -134,7 +146,8 @@ void loop() {
 			lastPostSensorTime = millis();
 		}
 	}
-	else {
+	else 
+	{
 #ifdef DEBUGGING
 		Serial.println("Client disconnected.");
 #endif
@@ -145,7 +158,8 @@ void loop() {
 	}
 }
 
-void collectSensorsData(String& data) {
+void collectSensorsData(String& data) 
+{
 	data = "";
 
 	// Humidity
@@ -162,10 +176,12 @@ void collectSensorsData(String& data) {
 	Serial.print("Creating data: ");
 #endif
 
-	if (!isnan(t)) {
+	if (!isnan(t)) 
+	{
 		data += "s:" + String(DHTPIN) + "_1:" + String(t);
 	}
-	if (!isnan(h)) {
+	if (!isnan(h)) 
+	{
 		data += ";s:" + String(DHTPIN) + "_2:" + String(h);
 	}
 #ifdef DEBUGGING
