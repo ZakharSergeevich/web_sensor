@@ -17,5 +17,9 @@
   <ItemGroup>
     <None Include="web_sensor.ino" />
   </ItemGroup>
- 
+  <ItemGroup>
+    <ClInclude Include="__vm\.web_sensor.vsarduino.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>
