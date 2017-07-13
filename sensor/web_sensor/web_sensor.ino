@@ -12,7 +12,7 @@
 
 #include <Ethernet.h>
 #include <EthernetClient.h>
-#include "DHT.h"
+
 #include <string.h>
 
 //#define DEBUGGING 1
@@ -37,7 +37,7 @@ IPAddress ip(192, 168, 1, 177);
 
 #define DHTPIN 2 // pin
 
-DHT dht(DHTPIN, DHT22);
+
 
 // initialize the library instance:
 EthernetClient client;
@@ -90,7 +90,7 @@ void setup() {
 	Serial.println("Start");
 #endif
 
-	dht.begin();
+	
 
 	// give the ethernet module time to boot up:
 	delay(1000);
@@ -149,10 +149,10 @@ void collectSensorsData(String& data) {
 	data = "";
 
 	// Humidity
-	h = dht.readHumidity();
+	//h = dht.readHumidity();
 
 	// Temperature
-	t = dht.readTemperature();
+	//t = dht.readTemperature();
 
 #ifdef DEBUGGING
 	Serial.print("read DHT Humidity = ");
