@@ -56,7 +56,7 @@ boolean connectClient()
 {
 	client.stop();
 
-	if (client.connect(HOST, 80)) 
+	if (client.connect(HOST, 52525)) 
 	{
 #ifdef DEBUGGING
 		Serial.println("Connected");
@@ -80,7 +80,8 @@ boolean connectClient()
 		Serial.println("Handshake successful");
 #endif
 	}
-	else {
+	else 
+	{
 #ifdef DEBUGGING
 		Serial.println("Handshake failed.");
 #endif
