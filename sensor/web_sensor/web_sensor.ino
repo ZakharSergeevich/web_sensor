@@ -33,6 +33,7 @@ by Tom Igoe, based on work by Adrian McEwen
 // GLOBAL VAR
 int timeOfRequest = 0;
 int timeOfStart = 0;
+int sensorData = 0;
 
 // Enter a MAC address for your controller below.
 // Newer Ethernet shields have a MAC address printed on a sticker on the shield
@@ -52,6 +53,9 @@ EthernetClient client;
 
 void setup() 
 {
+	// Interrupt Setup
+	attachInterrupt(0, sens, RISING);
+
 	// Open serial communications and wait for port to open:
 	Serial.begin(250000);
 	while (!Serial) 
@@ -69,40 +73,66 @@ void setup()
 	// give the Ethernet shield a second to initialize:
 	delay(1000);
 	Serial.println("connecting...");
+}
 
-	timeOfStart = millis();
-
-	// if you get a connection, report back via serial:
-	if (client.connect(server, 80))
-	{
-		Serial.println("connected");
-		// Make a HTTP request:
-		client.println("GET /search?q=arduino HTTP/1.1");
-		client.println("Host: www.google.com");
-		client.println("Connection: close");
-		client.println();
-	}
-	else
-	{
-		// if you didn't get a connection to the server:
-		Serial.println("connection failed");
-	}
-	Serial.print("TIME REQUEST: ");
-	timeOfRequest = millis() - timeOfStart;
-	Serial.println(timeOfRequest);
+// Interrupt function
+void sens()
+{
+	Serial.println("NEW SIGNAL !!!");
+	sensorData = sensorData + 1;
 }
 
 void loop() 
 {
+	
+
+	timeOfStart = millis();
+	static long long T = millis();
+	
+	if ((millis() - T) > 4000)	
+	{
+		// if you get a connection, report back via serial:
+		if (client.connect(server, 80))
+		{
+			Serial.println("connected");
+			// Make a HTTP request:
+			client.print("GET /search?q=");
+			client.print(sensorData);
+			client.println(" HTTP/1.1");
+			client.println("Host: www.google.com");
+			client.println("Connection: close");
+			client.println();	
+			sensorData = 0;
+		}
+		else
+		{
+			// if you didn't get a connection to the server:
+			Serial.println("connection failed");
+		}
+		Serial.print("TIME REQUEST: ");
+		timeOfRequest = millis() - timeOfStart;
+		Serial.println(timeOfRequest);
+		Serial.print("SENSOR DATA: ");
+		Serial.println(sensorData);
+
+		T = millis();
+	}
+
 	// if there are incoming bytes available
 	// from the server, read them and print them:
-	if (client.available())
+	delay(2000);
+	while (client.available())
 	{
 		char c = client.read();
 		Serial.print(c);
 	}
+	client.stop();
 
 	// if the server's disconnected, stop the client:
+}
+
+void discon()
+{
 	if (!client.connected())
 	{
 		Serial.println();
@@ -112,7 +142,8 @@ void loop()
 		Serial.print("TIME PRINT: ");
 		int timeOfPrint = millis() - timeOfStart - timeOfRequest;
 		Serial.println(timeOfPrint);
-
+		delay(3000);
+		Serial.println("END");
 		// do nothing forevermore:
 		while (true);
 	}
