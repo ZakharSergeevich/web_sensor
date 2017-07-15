@@ -10,182 +10,110 @@
 //   external_id = 2_1 (temperature)
 //   external_id = 2_2 (humidity)
 
+/*
+Web client
+
+This sketch connects to a website (http://www.google.com)
+using an Arduino Wiznet Ethernet shield.
+
+Circuit:
+* Ethernet shield attached to pins 10, 11, 12, 13
+
+created 18 Dec 2009
+by David A. Mellis
+modified 9 Apr 2012
+by Tom Igoe, based on work by Adrian McEwen
+
+*/
+
+#include <SPI.h>
 #include <Ethernet.h>
-#include <EthernetClient.h>
-
-#include <string.h>
-
-//#define DEBUGGING 1
-
-// Here we define a maximum framelength to 64 bytes. Default is 256.
-#define MAX_FRAME_LENGTH 64
-
-// Define how many callback functions you have. Default is 1.
-#define CALLBACK_FUNCTIONS 1
-
-#define HOST "192.168.0.15" // wall.electro-control-center.ru
-#define PATH "/" // /ws/<token>
-
-#include <WebSocketClient.h>
-
-byte mac[] = {
-	0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
-};
-// fill in an available IP address on your network here,
-// for manual configuration:
-IPAddress ip(192, 168, 0, 107);
-
-#define DHTPIN 2 // pin
 
 
+// GLOBAL VAR
+int timeOfRequest = 0;
+int timeOfStart = 0;
 
-// initialize the library instance:
+// Enter a MAC address for your controller below.
+// Newer Ethernet shields have a MAC address printed on a sticker on the shield
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+// if you don't want to use DNS (and reduce your sketch size)
+// use the numeric IP instead of the name for the server:
+//IPAddress server(74,125,232,128);  // numeric IP for Google (no DNS)
+char server[] = "www.google.com";    // name address for Google (using DNS)
+
+									 // Set the static IP address to use if the DHCP fails to assign
+IPAddress ip(192, 168, 1, 177);
+
+// Initialize the Ethernet client library
+// with the IP address and port of the server
+// that you want to connect to (port 80 is default for HTTP):
 EthernetClient client;
-
-WebSocketClient webSocketClient;
-
-unsigned long lastPostSensorTime = 0; // Время последней отправки данных с датчиков
-const unsigned long postSensorsInterval = 0.5L * 1000L; // delay between updates, in milliseconds
-
-String data;
-
-float t; // Температура с DHT-22
-float h; // Влажность с DHT-22
-
-boolean connectClient() 
-{
-	client.stop();
-
-	if (client.connect(HOST, 52525)) 
-	{
-#ifdef DEBUGGING
-		Serial.println("Connected");
-#endif
-	}
-	else 
-	{
-#ifdef DEBUGGING
-		Serial.println("Connection failed.");
-#endif
-		return false;
-	}
-
-	// Handshake with the server
-	webSocketClient.path = PATH;
-	webSocketClient.host = HOST;
-
-	if (webSocketClient.handshake(client)) 
-	{
-#ifdef DEBUGGING
-		Serial.println("Handshake successful");
-#endif
-	}
-	else 
-	{
-#ifdef DEBUGGING
-		Serial.println("Handshake failed.");
-#endif
-		return false;
-	}
-	return true;
-}
 
 void setup() 
 {
-#ifdef DEBUGGING
-	Serial.begin(9600);
-	Serial.println("Start");
-#endif
-
-	
-
-	// give the ethernet module time to boot up:
-	delay(1000);
-
-	Ethernet.begin(mac, ip);
-#ifdef DEBUGGING
-	Serial.print("My IP address: ");
-	Serial.println(Ethernet.localIP());
-#endif
-
-	// Try reconnect. Lock all another actions
-	while (!connectClient()) 
+	// Open serial communications and wait for port to open:
+	Serial.begin(250000);
+	while (!Serial) 
 	{
-		delay(2000);
-	};
+		; // wait for serial port to connect. Needed for native USB port only
+	}
+
+	// start the Ethernet connection:
+	//if (Ethernet.begin(mac) == 0) 
+	{
+		Serial.println("Failed to configure Ethernet using DHCP");
+		// try to congifure using IP address instead of DHCP:
+		Ethernet.begin(mac, ip);
+	}
+	// give the Ethernet shield a second to initialize:
+	delay(1000);
+	Serial.println("connecting...");
+
+	timeOfStart = millis();
+
+	// if you get a connection, report back via serial:
+	if (client.connect(server, 80))
+	{
+		Serial.println("connected");
+		// Make a HTTP request:
+		client.println("GET /search?q=arduino HTTP/1.1");
+		client.println("Host: www.google.com");
+		client.println("Connection: close");
+		client.println();
+	}
+	else
+	{
+		// if you didn't get a connection to the server:
+		Serial.println("connection failed");
+	}
+	Serial.print("TIME REQUEST: ");
+	timeOfRequest = millis() - timeOfStart;
+	Serial.println(timeOfRequest);
 }
 
 void loop() 
 {
-	if (client.connected()) 
+	// if there are incoming bytes available
+	// from the server, read them and print them:
+	if (client.available())
 	{
-		data = "";
-		// Try get data from websocket
-		webSocketClient.getData(data);
-
-		if (data.length() > 0) 
-		{
-#ifdef DEBUGGING
-			Serial.print("Received data: ");
-			Serial.println(data);
-#endif
-		}
-
-		if (millis() - lastPostSensorTime > postSensorsInterval) 
-		{
-#ifdef DEBUGGING
-			Serial.println("Creating data");
-#endif
-			// read data from sensor
-			collectSensorsData(data);
-#ifdef DEBUGGING
-			Serial.println(data);
-#endif
-
-			// send data to websocket
-			webSocketClient.sendData(data);
-			lastPostSensorTime = millis();
-		}
+		char c = client.read();
+		Serial.print(c);
 	}
-	else 
+
+	// if the server's disconnected, stop the client:
+	if (!client.connected())
 	{
-#ifdef DEBUGGING
-		Serial.println("Client disconnected.");
-#endif
-		// Try reconnect. Lock all another actions
-		while (!connectClient()) {
-			delay(2000);
-		};
+		Serial.println();
+		Serial.println("disconnecting.");
+		client.stop();
+
+		Serial.print("TIME PRINT: ");
+		int timeOfPrint = millis() - timeOfStart - timeOfRequest;
+		Serial.println(timeOfPrint);
+
+		// do nothing forevermore:
+		while (true);
 	}
-}
-
-void collectSensorsData(String& data) 
-{
-	data = "";
-
-	// Humidity
-	//h = dht.readHumidity();
-
-	// Temperature
-	//t = dht.readTemperature();
-
-#ifdef DEBUGGING
-	Serial.print("read DHT Humidity = ");
-	Serial.println(h);
-	Serial.print("read DHT Temperature = ");
-	Serial.println(t);
-	Serial.print("Creating data: ");
-#endif
-
-	if (!isnan(t)) 
-	{
-		data += "s:" + String(DHTPIN) + "_1:" + String(t);
-	}
-	if (!isnan(h)) 
-	{
-		data += ";s:" + String(DHTPIN) + "_2:" + String(h);
-	}
-#ifdef DEBUGGING
-	Serial.println(data);
-#endif
 }
