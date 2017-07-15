@@ -4,31 +4,17 @@
  Author:	zakha
 */
 
-// Send sensors data to electro control center
-// Use your own token from admin interface
-// In admin interface add 2 sensors
-//   external_id = 2_1 (temperature)
-//   external_id = 2_2 (humidity)
+// Connect to Microsoft Azure IOT
 
-/*
-Web client
 
-This sketch connects to a website (http://www.google.com)
-using an Arduino Wiznet Ethernet shield.
-
-Circuit:
-* Ethernet shield attached to pins 10, 11, 12, 13
-
-created 18 Dec 2009
-by David A. Mellis
-modified 9 Apr 2012
-by Tom Igoe, based on work by Adrian McEwen
-
-*/
 
 #include <SPI.h>
 #include <Ethernet.h>
 
+char hostname[] = "zakhar.azure-devices.net"; // имя узла Azure IoT Hub
+char authSAS[] = "SharedAccessSignature sr=zakhar.azure-devices.net%2Fdevices%2Fsensor1&sig=92wNmX5ZzlEBMLHJgsrtWulnkJD3O6v3fkuJmMN5c2I%3D&se=1531236776";
+String deviceName = "sensor1"; // ID нашего девайса
+String uri = "/devices/sensor1/messages/events?api-version=2016-02-03";
 
 // GLOBAL VAR
 int timeOfRequest = 0;
@@ -38,12 +24,6 @@ int sensorData = 0;
 // Enter a MAC address for your controller below.
 // Newer Ethernet shields have a MAC address printed on a sticker on the shield
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-// if you don't want to use DNS (and reduce your sketch size)
-// use the numeric IP instead of the name for the server:
-//IPAddress server(74,125,232,128);  // numeric IP for Google (no DNS)
-char server[] = "www.google.com";    // name address for Google (using DNS)
-
-									 // Set the static IP address to use if the DHCP fails to assign
 IPAddress ip(192, 168, 1, 177);
 
 // Initialize the Ethernet client library
@@ -82,51 +62,60 @@ void sens()
 	sensorData = sensorData + 1;
 }
 
+void httpPost(String content)
+{
+	client.stop(); // закрываем подключение, если вдруг оно открыто
+	if (client.connect(hostname, 443)) 
+	{
+		Serial.println("connect!!");
+		client.print("POST ");
+		client.print(uri);
+		client.println(" HTTP/1.1");
+		client.print("Host: ");
+		client.println(hostname);
+		client.print("Authorization: ");
+		client.println(authSAS);
+		client.println("Connection: close");
+		client.print("Content-Type: ");
+		client.println("text/plain");
+		client.print("Content-Length: ");
+		client.println(content.length());
+		client.println();
+		client.println(content);
+		delay(200);
+	}
+	else 
+	{
+		Serial.println("HTTP POST отправка неудачна");
+	}
+}
+
 void loop() 
 {
-	
-
-	timeOfStart = millis();
-	static long long T = millis();
-	
-	if ((millis() - T) > 4000)	
+	delay(1000);
+	httpPost("Some message from Arduino");
+	String response = "";
+	char c;
+	while (client.available()) 
 	{
-		// if you get a connection, report back via serial:
-		if (client.connect(server, 80))
+		c = client.read();
+		response.concat(c);
+	}
+	if (!response.equals(""))
+	{
+		if (response.startsWith("HTTP/1.1 204")) 
 		{
-			Serial.println("connected");
-			// Make a HTTP request:
-			client.print("GET /search?q=");
-			client.print(sensorData);
-			client.println(" HTTP/1.1");
-			client.println("Host: www.google.com");
-			client.println("Connection: close");
-			client.println();	
-			sensorData = 0;
+			Serial.println("Строка была отправлена в Azure");
 		}
-		else
+		else 
 		{
-			// if you didn't get a connection to the server:
-			Serial.println("connection failed");
+			Serial.println("Ошибка");
+			Serial.println(response);
 		}
-		Serial.print("TIME REQUEST: ");
-		timeOfRequest = millis() - timeOfStart;
-		Serial.println(timeOfRequest);
-		Serial.print("SENSOR DATA: ");
-		Serial.println(sensorData);
-
-		T = millis();
 	}
 
-	// if there are incoming bytes available
-	// from the server, read them and print them:
-	delay(2000);
-	while (client.available())
-	{
-		char c = client.read();
-		Serial.print(c);
-	}
-	client.stop();
+	
+
 
 	// if the server's disconnected, stop the client:
 }
