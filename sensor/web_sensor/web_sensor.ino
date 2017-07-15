@@ -11,129 +11,132 @@
 #include <SPI.h>
 #include <Ethernet.h>
 
-char hostname[] = "zakhar.azure-devices.net"; // имя узла Azure IoT Hub
-char authSAS[] = "SharedAccessSignature sr=zakhar.azure-devices.net%2Fdevices%2Fsensor1&sig=92wNmX5ZzlEBMLHJgsrtWulnkJD3O6v3fkuJmMN5c2I%3D&se=1531236776";
-String deviceName = "sensor1"; // ID нашего девайса
-String uri = "/devices/sensor1/messages/events?api-version=2016-02-03";
-
-// GLOBAL VAR
-int timeOfRequest = 0;
-int timeOfStart = 0;
-int sensorData = 0;
-
-// Enter a MAC address for your controller below.
-// Newer Ethernet shields have a MAC address printed on a sticker on the shield
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-IPAddress ip(192, 168, 1, 177);
-
-// Initialize the Ethernet client library
-// with the IP address and port of the server
-// that you want to connect to (port 80 is default for HTTP):
+byte mac[] = {
+	0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02 };
+const char *server = "zakhar.servicebus.windows.net";
+const char *sas = "SharedAccessSignature sr=https%3a%2f%2fzakhar.servicebus.windows.net%2fevhub1%2fpublishers%2f1%2fmessages&sig=8trW18kJ4S8sK5NLa%2fbmna7yHRMCYZEChO1%2bkPQcoZU%3d&se=1536144312&skn=send";
+const char *serviceNamespace = "zakhar";
+const char *hubName = "evhub1";
+const char *deviceName = "1";
 EthernetClient client;
+char buffer[64];
 
-void setup() 
+void send_request(int value)
 {
-	// Interrupt Setup
-	attachInterrupt(0, sens, RISING);
-
-	// Open serial communications and wait for port to open:
-	Serial.begin(250000);
-	while (!Serial) 
+	Serial.println("\nconnecting...");
+	if (client.connect(server, 443)) 
 	{
-		; // wait for serial port to connect. Needed for native USB port only
-	}
 
-	// start the Ethernet connection:
-	//if (Ethernet.begin(mac) == 0) 
-	{
-		Serial.println("Failed to configure Ethernet using DHCP");
-		// try to congifure using IP address instead of DHCP:
-		Ethernet.begin(mac, ip);
-	}
-	// give the Ethernet shield a second to initialize:
-	delay(1000);
-	Serial.println("connecting...");
-}
+		Serial.print("sending");
+		Serial.println(value);
 
-// Interrupt function
-void sens()
-{
-	Serial.println("NEW SIGNAL !!!");
-	sensorData = sensorData + 1;
-}
+		// POST URI
+		sprintf(buffer, "POST /eventhubtest1/publishers/%s/messages HTTP/1.1", deviceName);
+		client.println(buffer);
 
-void httpPost(String content)
-{
-	client.stop(); // закрываем подключение, если вдруг оно открыто
-	if (client.connect(hostname, 443)) 
-	{
-		Serial.println("connect!!");
-		client.print("POST ");
-		client.print(uri);
-		client.println(" HTTP/1.1");
-		client.print("Host: ");
-		client.println(hostname);
-		client.print("Authorization: ");
-		client.println(authSAS);
-		client.println("Connection: close");
-		client.print("Content-Type: ");
-		client.println("text/plain");
-		client.print("Content-Length: ");
-		client.println(content.length());
+		// Host header
+		sprintf(buffer, "Host: %s", server);
+		client.println(buffer);
+
+		// Application key
+		sprintf(buffer, "Authorization: %s", sas);
+		client.println(buffer);
+
+		// content type
+		client.println("Content-Type: application/atom+xml;type=entry;charset=utf-8");
+
+		// POST body
+		sprintf(buffer, "{\"value\": %s}", "Hello World");
+
+		// Content length
+		client.print("Content-Length");
+		client.println(strlen(buffer));
+
+		// End of headers
 		client.println();
-		client.println(content);
-		delay(200);
+
+		// Request body
+		client.println(buffer);
 	}
 	else 
 	{
-		Serial.println("HTTP POST отправка неудачна");
+		Serial.println("connection failed");
+	}
+}
+/*
+** Wait for response
+*/
+void wait_response()
+{
+	while (!client.available()) 
+	{
+		if (!client.connected()) 
+		{
+			return;
+		}
 	}
 }
 
-void loop() 
+
+/*
+** Read the response and dump to serial
+*/
+void read_response()
 {
+	bool print = true;
+	while (client.available()) {
+		char c = client.read();
+		// Print only until the first carriage return
+		if (c == '\n') 
+		{
+			print = false;
+		}
+		if (print)
+			Serial.print(c);
+	}
+	if (!client.available()) 
+	{
+		char c = client.read();
+		Serial.print(c);
+	}
+}
+
+
+/*
+** Close the connection
+*/
+void end_request()
+{
+	client.stop();
+}
+/*
+** Arduino Setup
+*/
+void setup()
+{
+	Serial.begin(250000);
+	while (!Serial) {
+		; // wait for serial port to connect.
+	}
+	Serial.println("ethernet");
+	if (Ethernet.begin(mac) == 0) {
+		Serial.println("ethernet failed");
+		for (;;);
+	}
+	// give the Ethernet shield a second to initialize:
 	delay(1000);
-	httpPost("Some message from Arduino");
-	String response = "";
-	char c;
-	while (client.available()) 
-	{
-		c = client.read();
-		response.concat(c);
-	}
-	if (!response.equals(""))
-	{
-		if (response.startsWith("HTTP/1.1 204")) 
-		{
-			Serial.println("Строка была отправлена в Azure");
-		}
-		else 
-		{
-			Serial.println("Ошибка");
-			Serial.println(response);
-		}
-	}
-
-	
-
-
-	// if the server's disconnected, stop the client:
 }
 
-void discon()
-{
-	if (!client.connected())
-	{
-		Serial.println();
-		Serial.println("disconnecting.");
-		client.stop();
 
-		Serial.print("TIME PRINT: ");
-		int timeOfPrint = millis() - timeOfStart - timeOfRequest;
-		Serial.println(timeOfPrint);
-		delay(3000);
-		Serial.println("END");
-		// do nothing forevermore:
-		while (true);
-	}
+/*
+** Arduino Loop
+*/
+void loop()
+{
+	int val = analogRead(A0);
+	send_request(val);
+	wait_response();
+	read_response();
+	end_request();
+	delay(1000);
 }
