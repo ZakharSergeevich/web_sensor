@@ -40,8 +40,8 @@ int sensorData = 0;
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 // if you don't want to use DNS (and reduce your sketch size)
 // use the numeric IP instead of the name for the server:
-//IPAddress server(74,125,232,128);  // numeric IP for Google (no DNS)
-char server[] = "www.google.com";    // name address for Google (using DNS)
+IPAddress server(192,168,1,200);  // numeric IP for Google (no DNS)
+//char server[] = "www.google.com";    // name address for Google (using DNS)
 
 									 // Set the static IP address to use if the DHCP fails to assign
 IPAddress ip(192, 168, 1, 177);
@@ -92,16 +92,17 @@ void loop()
 	if ((millis() - T) > 4000)	
 	{
 		// if you get a connection, report back via serial:
-		if (client.connect(server, 80))
+		if (client.connect(server, 53210))
 		{
 			Serial.println("connected");
 			// Make a HTTP request:
-			client.print("GET /search?q=");
+			//client.print("GET /search?q=");
+			//client.print(sensorData);
+			//client.println(" HTTP/1.1");
+			//client.println("Host: www.google.com");
+			//client.println("Connection: close");
+			//client.println();	
 			client.print(sensorData);
-			client.println(" HTTP/1.1");
-			client.println("Host: www.google.com");
-			client.println("Connection: close");
-			client.println();	
 			sensorData = 0;
 		}
 		else
@@ -126,7 +127,11 @@ void loop()
 		char c = client.read();
 		Serial.print(c);
 	}
-	client.stop();
+	Serial.println();
+	if (client.connected())
+	{
+		client.stop();
+	}
 
 	// if the server's disconnected, stop the client:
 }
