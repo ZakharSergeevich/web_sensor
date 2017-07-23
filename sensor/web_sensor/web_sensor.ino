@@ -26,13 +26,18 @@ by Tom Igoe, based on work by Adrian McEwen
 
 */
 
+#include <Ultrasonic.h>
 #include <SPI.h>
 #include <Ethernet.h>
+#include <string.h>
 
 
 // GLOBAL VAR
-int timeOfRequest = 0;
-int timeOfStart = 0;
+long long timeOfStart = 0;
+static long long t_ultrasonic = 0;
+static long long t_http_request = 0;
+static int counter = 0;
+
 int sensorData = 0;
 
 // Enter a MAC address for your controller below.
@@ -51,17 +56,13 @@ IPAddress ip(192, 168, 1, 177);
 // that you want to connect to (port 80 is default for HTTP):
 EthernetClient client;
 
+// Init Ultrasonic
+Ultrasonic ultrasonic(8, 9);
+
 void setup() 
 {
-	// Interrupt Setup
-	attachInterrupt(0, sens, RISING);
-
 	// Open serial communications and wait for port to open:
 	Serial.begin(250000);
-	while (!Serial) 
-	{
-		; // wait for serial port to connect. Needed for native USB port only
-	}
 
 	// start the Ethernet connection:
 	//if (Ethernet.begin(mac) == 0) 
@@ -75,81 +76,96 @@ void setup()
 	Serial.println("connecting...");
 }
 
-// Interrupt function
-void sens()
-{
-	Serial.println("NEW SIGNAL !!!");
-	sensorData = sensorData + 1;
-}
 
-void loop() 
+void loop()
 {
-	
+	timeOfStart = millis();	
 
-	timeOfStart = millis();
-	static long long T = millis();
-	
-	if ((millis() - T) > 4000)	
+	if ((millis() - t_ultrasonic) > 50)
 	{
-		// if you get a connection, report back via serial:
-		if (client.connect(server, 53210))
+		t_ultrasonic = millis();
+
+		sensorData = ultrasonic.distanceRead();
+
+		static bool flag = 0;
+
+		if (sensorData < 50)
 		{
-			Serial.println("connected");
-			// Make a HTTP request:
-			//client.print("GET /search?q=");
-			//client.print(sensorData);
-			//client.println(" HTTP/1.1");
-			//client.println("Host: www.google.com");
-			//client.println("Connection: close");
-			//client.println();	
-			client.print(sensorData);
-			sensorData = 0;
+			if (flag == 0)
+			{
+				counter = counter + 1;
+				sound();
+				flag = 1;
+				Serial.println(counter);
+			}
+
 		}
 		else
 		{
-			// if you didn't get a connection to the server:
-			Serial.println("connection failed");
+			flag = 0;
 		}
-		Serial.print("TIME REQUEST: ");
-		timeOfRequest = millis() - timeOfStart;
-		Serial.println(timeOfRequest);
-		Serial.print("SENSOR DATA: ");
-		Serial.println(sensorData);
+	}
 
-		T = millis();
+	// to server JSON data
+	String dataString = "{\"sens\":\"" + String(counter) + "\"}";
+	//Serial.print(dataString.length());
+	//Serial.println(dataString);
+	
+
+	if ((millis() - t_http_request) > 10000)	
+	{
+		t_http_request = millis();
+		
+		// POST to SERVER
+		postRequest(dataString);
+		
+		
+
+		if (client.connected())
+		{
+			client.stop();
+		}
 	}
 
 	// if there are incoming bytes available
 	// from the server, read them and print them:
-	delay(2000);
 	while (client.available())
 	{
 		char c = client.read();
 		Serial.print(c);
 	}
-	Serial.println();
-	if (client.connected())
-	{
-		client.stop();
-	}
-
-	// if the server's disconnected, stop the client:
 }
 
-void discon()
-{
-	if (!client.connected())
-	{
-		Serial.println();
-		Serial.println("disconnecting.");
-		client.stop();
 
-		Serial.print("TIME PRINT: ");
-		int timeOfPrint = millis() - timeOfStart - timeOfRequest;
-		Serial.println(timeOfPrint);
-		delay(3000);
-		Serial.println("END");
-		// do nothing forevermore:
-		while (true);
+void sound()
+{
+	tone(7, 1000, 50);
+}
+
+void postRequest(String dataString)
+{
+	client.setTimeout(100);
+
+	if (client.connect(server, 2000))
+	{
+		Serial.println("connected");
+		// Make a HTTP POST request:
+		client.print("POST /sensor/");
+		client.println(" HTTP/1.1");
+		client.println("Host: 192.168.1.200");
+		client.println("Content-Type: application/json");
+		//client.println("User-Agent: arduino-ethernet");
+		client.println("Connection: close");
+		client.print("Content-Length: ");
+		client.println(String(dataString.length()));	// number of bytes in the payload													
+		client.println();	// important need an empty line here 
+		client.println(dataString);// the payload
+
+		counter = 0;
+	}
+	else
+	{
+		// if you didn't get a connection to the server:
+		Serial.println("connection failed");
 	}
 }
